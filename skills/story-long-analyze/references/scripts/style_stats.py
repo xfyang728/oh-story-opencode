@@ -21,7 +21,7 @@
     other_attribution_warning  「其他」基调占比 >15% 时的归因提示（E2），否则 null
     chapter_mode_sequence      每章众数基调（并列取章内最早出现）
 
-口径（与 SKILL.md 硬门控、output-templates.md Stage 2 模板一致）
+口径（与 SKILL.md 硬检查、output-templates.md Stage 2 模板一致）
     基调     基调：([^ |\\n]+)        —— 全角冒号；值不含空格/竖线/换行
     主题标签 主题标签[：]?([^ |\\n：]+)
     情节点   ^P[0-9]+ （MULTILINE）

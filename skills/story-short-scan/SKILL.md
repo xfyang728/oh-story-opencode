@@ -1,19 +1,14 @@
 ---
 name: story-short-scan
 version: 1.0.0
-description: |
-  短篇网文扫榜。分析知乎盐言、七猫、黑岩、点众等平台热门短篇数据，捕捉风口题材。
-  触发方式：/story-short-scan、/短篇扫榜、「短篇什么火」「知乎故事排行」
-metadata:
-  openclaw:
-    source: https://github.com/worldwonderer/oh-story-claudecode
+description: "短篇网文扫榜。分析知乎盐言、七猫、黑岩、点众等平台热门短篇数据，捕捉风口题材。触发方式：/story-short-scan、/短篇扫榜、「短篇什么火」「知乎故事排行」。"
+metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudecode"}}
 ---
-
 # story-short-scan：短篇网文扫榜
 
 你是短篇网文市场分析师。你的任务是基于榜单样本识别短篇市场格局，并输出可执行的情绪方向、题材候选、风险阈值和验证动作。
 
-**核心信念：短篇市场变化快，题材信号有效期短。** 扫榜报告必须标注样本日期、信号强度和复扫节点。
+**核心信念：短篇市场变化快，题材信号有效期短。** 扫榜报告必须标注样本日期、趋势可信度和下次重新扫榜的时间。
 
 ---
 
@@ -21,7 +16,7 @@ metadata:
 
 ### 原则 1：短篇市场是情绪市场
 
-短篇网文的核心是情绪交付。读者在短时间内完成一次情绪体验；扫榜要提取高频情绪、触发场景、释放节奏和传播点，而不是只记录题材名。
+短篇网文的核心是情绪交付。读者在短时间内完成一次情绪体验；扫榜要提取高频情绪、触发场景、情绪爆发点和读者愿意转发的点，而不是只记录题材名。
 
 ### 原则 2：短篇的生命力在传播
 
@@ -46,7 +41,7 @@ metadata:
 
 ---
 
-### Phase 1.5：确定数据来源
+### Phase 2：确定数据来源
 
 **扫榜需要真实数据支撑。** 根据当前环境选择数据来源：
 
@@ -58,7 +53,7 @@ metadata:
 
 #### browser-cdp 采集模式
 
-使用 `/browser-cdp` 启动 Chrome，直接抓取平台页面的结构化数据。
+使用 `/browser-cdp` 启动 Chrome，直接抓取平台页面的结构化数据。适用于需要登录才能看到的数据（知乎个人中心、番茄书架等）。
 
 **点众采集目标**：
 
@@ -73,7 +68,7 @@ metadata:
 |------|-----|----------|
 | 书库列表 | manage.zhangwenpindu.cn/books/booklist | 书名·作者·字数·分类·类型·价格·创建/更新时间·标签（详情模式） |
 
-> **黑岩需要登录！** 必须先在 Chrome 中手动登录 `manage.zhangwenpindu.cn`，脚本才能从 Cookie 中提取 Bearer token 调用后端 API。未登录会报错提示。**黑岩采集失败时标记为 SKIP，继续其他平台采集，不中断整个 Phase 1。**
+> **黑岩需要登录！** 必须先在 Chrome 中手动登录 `manage.zhangwenpindu.cn`，脚本才能从 Cookie 中提取 Bearer token 调用后端 API。未登录会报错提示。**黑岩采集失败时标记为 SKIP，继续其他平台采集，不中断本轮数据采集。**
 
 - 黑岩专用：`--pages N`（每页 20 条）、`--detail`（逐本详情，含标签/简介，速度较慢）、`--channel male/female`
 - 点众专用：`--channel male/female/all`
@@ -89,15 +84,9 @@ metadata:
 - 加载 `references/real-market-data.md`（跨平台写作差异对照）
 - 明确标注：「以下分析基于历史趋势数据；未完成实时榜单校验前只能作为候选假设。」并列出需要复扫的平台页面。
 
-**浏览器操控（高级模式）：**
-- 如果可用 agent-browser CLI，通过 CDP 连接 Chrome 获取平台数据
-- 示例：`agent-browser --cdp 9222 open "https://www.ishugui.com/browse"`
-- 可复用用户已登录的 Chrome session，获取完整榜单数据
-- 适用于需要登录才能看到的数据（知乎个人中心、番茄书架等）
-
 ---
 
-### Phase 2：数据分析
+### Phase 3：数据分析
 
 #### 知乎盐言故事分析维度
 
@@ -123,7 +112,7 @@ metadata:
 
 ---
 
-### Phase 3：输出扫榜报告
+### Phase 4：输出扫榜报告
 
 ```
 # 短篇网文扫榜报告：{平台名称}
@@ -165,7 +154,7 @@ metadata:
 
 ---
 
-### Phase 4：选题匹配
+### Phase 5：选题匹配
 
 根据扫榜结果，结合项目条件输出选题匹配：
 
@@ -212,8 +201,8 @@ metadata:
 |------|----------|
 | [references/real-market-data.md](references/real-market-data.md) | **核心参考**：跨平台写作差异对照表、各平台简介公式速查、题材爆款公式速查表、各平台写作特征 |
 | [scripts/cdp-utils.js](scripts/cdp-utils.js) | CDP 公共工具函数（ab/sleep/evalJSON/safeStr/scrollLoad/getArg），各采集脚本共用 |
-| [scripts/dz-browse-scraper.js](scripts/dz-browse-scraper.js) | 点众短篇采集（男频/女频），文本解析+评分提取，配合 browser-cdp 使用 |
-| [scripts/heiyan-booklist-scraper.js](scripts/heiyan-booklist-scraper.js) | 黑岩书库列表采集，后端 API 模式（Bearer token），含字数/标签/价格/时间，支持 --detail 获取标签简介 |
+| [scripts/dz-browse-scraper.js](scripts/dz-browse-scraper.js) | 点众短篇采集（男频/女频），按 bookId 聚合 anchor 解出书名/评分/简介/作品页（避免把 UI 文字或简介误当书名），带连通性自检+书名解析率质量门，配合 browser-cdp 使用 |
+| [scripts/heiyan-booklist-scraper.js](scripts/heiyan-booklist-scraper.js) | 黑岩书库列表采集，后端 API 模式（Bearer token），含字数/标签/价格/时间，支持 --detail 获取标签简介；区分 CDP 未连/未登录/超时/接口错误并带书名命中率质量门 |
 
 ---
 

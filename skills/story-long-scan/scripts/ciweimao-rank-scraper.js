@@ -17,9 +17,17 @@
 
 const fs = require("fs");
 const path = require("path");
-const { ab, sleep, evalJSON, scrollLoad, getArg } = require("./cdp-utils");
+const { ab, sleep, evalJSONBase64, scrollLoad, getArg, localDateStamp, runCli } = require("./cdp-utils");
 
 const RANK_URL = "https://www.ciweimao.com/rank-index";
+
+/** 连通性 + 页面就绪自检 */
+function probePage(port) {
+  return evalJSONBase64(
+    port,
+    "JSON.stringify({host:location.host,len:(document.body&&document.body.innerText||'').length})"
+  );
+}
 
 const RANK_TYPES = [
   { id: "click", label: "点击榜", header: "点击榜" },
@@ -81,21 +89,28 @@ function extractAllRanks(port) {
     "if(curName&&curEntries.length)sections.push({name:curName,entries:curEntries});" +
     "return sections" +
     "})())";
-  return evalJSON(port, js) || [];
+  return evalJSONBase64(port, js) || [];
 }
 
-/** 从 DOM 获取书籍链接（去重，含标题用于匹配） */
+/**
+ * 从 DOM 获取书籍链接。每本书常有封面图 anchor（textContent 为空）和书名 anchor，
+ * 按 bookId 聚合后取最长的非空文本作为书名，避免空封面 anchor 覆盖书名导致回填全失败。
+ */
 function extractBookUrls(port) {
-  const js =
-    "JSON.stringify((()=>{" +
-    "var seen=new Set();var urls=[];" +
-    "Array.from(document.querySelectorAll('a[href*=\"/book/\"]')).forEach(function(a){" +
-    "var h=a.getAttribute('href')||a.href||'';" +
-    "var m=h.match(/\\/book\\/(\\d+)/);" +
-    "if(m&&!seen.has(m[1])){seen.add(m[1]);urls.push({bookId:m[1],title:a.textContent.trim(),url:'https://www.ciweimao.com/book/'+m[1]})}" +
-    "});return urls" +
-    "})())";
-  return evalJSON(port, js) || [];
+  const js = `JSON.stringify((function(){
+    function clean(t){return t.replace(/^[0-9]+\\[[^\\]]*\\]/,'').replace(/\\s+[0-9.]+(?:万|亿)?$/,'').trim();}
+    var byId={};var order=[];
+    Array.from(document.querySelectorAll('a[href*="/book/"]')).forEach(function(a){
+      var h=a.getAttribute('href')||a.href||'';
+      var m=h.match(/\\/book\\/([0-9]+)/);
+      if(!m)return; var id=m[1];
+      var t=clean((a.innerText||a.textContent||'').replace(/\\s+/g,' ').trim());
+      if(!byId[id]){byId[id]='';order.push(id);}
+      if(t&&t.length>byId[id].length)byId[id]=t;
+    });
+    return order.map(function(id){return {bookId:id,title:byId[id],url:'https://www.ciweimao.com/book/'+id};});
+  })())`;
+  return evalJSONBase64(port, js) || [];
 }
 
 // ---------------------------------------------------------------------------
@@ -115,19 +130,39 @@ function main() {
   try {
     ab(PORT, "open", RANK_URL);
     sleep(4000);
+
+    // 连通性自检：CDP 未起/被重定向时给可操作报错，而非误报"结构已变"
+    const probe = probePage(PORT);
+    if (!probe) {
+      console.error(
+        `  ✗ CDP 无响应。请确认已用 browser-cdp 启动 Chrome（端口 ${PORT}），且 agent-browser 可用。`
+      );
+      return 0;
+    }
+    if (probe.host && probe.host.indexOf("ciweimao") === -1) {
+      console.error(`  ✗ 当前页面非刺猬猫（host=${probe.host}），可能被重定向，已跳过。`);
+      return 0;
+    }
+
     scrollLoad(PORT, 3);
     sleep(1000);
 
     sections = extractAllRanks(PORT);
     if (!sections.length) {
-      console.error("[ciweimao] 采集失败：页面结构可能已变（选择器没匹配到数据），请检查榜单URL或更新选择器");
-      return;
+      // 懒加载可能未触发，再滚动重试一次
+      scrollLoad(PORT, 2);
+      sleep(1000);
+      sections = extractAllRanks(PORT);
+    }
+    if (!sections.length) {
+      console.error("[ciweimao] 采集失败：未解析到榜单（页面结构可能变动或未加载）。请人工打开榜单页确认。");
+      return 0;
     }
 
     urls = extractBookUrls(PORT);
   } catch (err) {
     console.error(`[ciweimao] 采集失败（页面加载或提取阶段）: ${err.message}`);
-    return;
+    return 0;
   }
 
   console.log(`  ✓ 提取 ${sections.length} 个榜单，${urls.length} 个书籍链接`);
@@ -138,6 +173,7 @@ function main() {
       ? RANK_TYPES
       : RANK_TYPES.filter((r) => r.id === RANKTYPE);
 
+  let written = 0;
   for (const rt of targetTypes) {
     try {
       const section = sections.find((s) => s.name === rt.header);
@@ -147,12 +183,17 @@ function main() {
       }
 
       const now = new Date().toISOString();
+      const norm = (s) => (s || "").replace(/\s+/g, "");
+      const linked = section.entries.filter((e) =>
+        urls.some((u) => norm(u.title) === norm(e.title))
+      ).length;
       const lines = [
         `# 刺猬猫 · ${rt.label}`,
         "",
         `- 来源：${RANK_URL}`,
         `- 抓取时间：${now}`,
         `- 条目数：${section.entries.length}`,
+        `- 作品页链接：${linked} / ${section.entries.length}`,
         "",
         "---",
         "",
@@ -168,8 +209,8 @@ function main() {
           ].filter(Boolean).join(" · ");
           if (meta) lines.push(`*${meta}*`);
 
-          // 按标题匹配书籍链接
-          const matched = urls.find((u) => u.title === entry.title);
+          // 按标题匹配书籍链接（归一后比对）
+          const matched = urls.find((u) => norm(u.title) === norm(entry.title));
           if (matched) {
             lines.push(`[作品页](${matched.url})`);
           }
@@ -181,21 +222,21 @@ function main() {
         }
       }
 
-      const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-      const filename = `刺猬猫${rt.label}_${date}.md`;
+      const filename = `刺猬猫${rt.label}_${localDateStamp()}.md`;
       fs.mkdirSync(OUTDIR, { recursive: true });
       const filepath = path.join(OUTDIR, filename);
       fs.writeFileSync(filepath, lines.join("\n"), "utf-8");
+      written++;
       console.log(`  ✓ ${rt.label}：${section.entries.length} 条 → ${filepath}`);
     } catch (rankErr) {
       console.error(`[ciweimao] ${rt.label} 处理出错，跳过: ${rankErr.message}`);
     }
   }
+  return written;
 }
 
-try {
-  main();
-} catch (e) {
-  console.error(`刺猬猫采集失败: ${e && e.message ? e.message : e}`);
-  process.exit(1);
+if (require.main === module) {
+  runCli(main, "刺猬猫采集");
 }
+
+module.exports = { extractAllRanks, extractBookUrls };

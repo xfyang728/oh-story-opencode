@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""verify_gates.py — chapter-extractor 产物的可机械校验硬门控（story-long-analyze Stage 2）
+"""verify_gates.py — chapter-extractor 产物的可机械校验硬检查（story-long-analyze Stage 2）
 
 用途
-    对 章节/第N章_摘要.md 逐文件执行 SKILL.md「可机械校验的硬门控」四项检查，
+    对 章节/第N章_摘要.md 逐文件执行 SKILL.md「可机械校验的硬检查」四项检查，
     主线程落盘后直接运行（或由 fixer lane prompt 附带的 verify_gates 步骤调用），
     不依赖 agent 自报。任一文件 FAIL 即退出码 1。
 
@@ -11,7 +11,7 @@
     py verify_gates.py <章节目录或单个摘要md>...
     （参数可混合：目录会展开为其下全部 .md；可一次传多个路径）
 
-检查项（与 SKILL.md 硬门控一致）
+检查项（与 SKILL.md 硬检查一致）
     1. 情节点数 N = 匹配 ^P[0-9]+ （行首）的行数，N >= 10
     2. 「基调：」（全角冒号）出现次数必须 == N
        —— 少于 N = 有情节点漏「基调：」或漏全角冒号（下游 Stage 6 按全角 grep 会静默漏章）
@@ -100,7 +100,7 @@ def check_file(path):
 def expand_targets(raw_paths):
     """把命令行路径展开为待检文件列表。
 
-    目录模式只取 第N章_摘要.md（*_摘要.md）——硬门控对象是 chapter-extractor
+    目录模式只取 第N章_摘要.md（*_摘要.md）——硬检查对象是 chapter-extractor
     产物；同目录下的 第N章_深度拆解.md / 汇总文件不在门控范围。单文件模式照检。
     """
     files = []

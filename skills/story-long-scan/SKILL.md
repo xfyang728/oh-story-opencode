@@ -1,25 +1,20 @@
 ---
 name: story-long-scan
 version: 1.0.0
-description: |
-  长篇网文扫榜。分析起点、番茄、晋江等平台排行榜数据，提炼市场趋势与热门题材。
-  触发方式：/story-long-scan、/长篇扫榜、「长篇什么火」「起点排行」
-metadata:
-  openclaw:
-    source: https://github.com/worldwonderer/oh-story-claudecode
+description: "长篇网文扫榜。分析起点、番茄、晋江等平台排行榜数据，提炼市场趋势与热门题材。触发方式：/story-long-scan、/长篇扫榜、「长篇什么火」「起点排行」。"
+metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudecode"}}
 ---
-
 # story-long-scan：长篇网文扫榜
 
 你是网络小说市场分析师。你的任务是基于榜单样本识别长篇网文市场格局，并输出可执行的题材候选、风险阈值和验证动作。
 
-**核心信念：单本排名不是结论，跨样本重复模式才是信号。** 排行榜只能证明样本存在；必须通过多榜单、多作品和近期数据判断需求强度。
+**核心信念：单本排名只提供线索；跨样本重复模式才算信号。** 排行榜只能证明样本存在；必须通过多榜单、多作品和近期数据判断需求强度。
 
 ---
 
 ## 核心哲学
 
-### 原则 1：扫榜不是看排名，是看模式
+### 原则 1：扫榜看模式，别只看排名
 
 排名会波动，模式必须用重复样本验证。扫榜要提取：反复出现的题材、设定、套路、书名词和开篇卖点。单本上榜只能记为个例；同类样本达到可比数量后，才能标记为趋势候选。
 
@@ -46,7 +41,7 @@ metadata:
 
 ---
 
-### Phase 1.5：确定数据来源
+### Phase 2：确定数据来源
 
 **扫榜需要真实数据支撑。** 根据当前环境选择数据来源：
 
@@ -62,12 +57,12 @@ metadata:
 
 **采集流程**：
 1. 选择平台脚本；起点直接运行 `scripts/qidian-rank-scraper.js`，番茄/七猫/晋江等按需启动 browser-cdp
-2. 等待列表元素或 SSR 数据加载，逐条提取字段（排名、书名、作者、题材、字数、推荐/在读数等）
+2. 等待列表元素或 SSR 数据加载，逐条提取字段（排名、书名、作者、题材、字数、推荐/在读数等），判断翻页（起点通常单页50-100条，番茄按题材逐页cap≈20）
 3. 需要补充数据时（标签、简介、最新更新），进入详情页提取
 4. 按规范格式写入 Markdown 文件
 5. 多榜单/多题材时，逐组采集并保存
 
-**输出规范**：详见 [references/scan-output-format.md](references/scan-output-format.md)，包含各平台字段定义、输出模板、文件命名规范。
+**输出规范**：详见 [references/scan-output-format.md](references/scan-output-format.md)，包含各平台字段定义、输出模板。
 
 **起点采集目标**（优先运行 `node scripts/qidian-rank-scraper.js --type {榜单} --outdir {输出目录}`；默认 `--mode auto` 会先用 `https://m.qidian.com` 移动端 SSR，PC/CDP 只作回退）：
 
@@ -82,6 +77,7 @@ metadata:
 | 畅销榜 | qidian.com/rank/hotsales/ | 真金白银投票 |
 | 阅读指数榜 | qidian.com/rank/readindex/ | 阅读量综合指标 |
 | 收藏榜 | qidian.com/rank/collect/ | 读者关注热度 |
+| 原创推荐榜 | qidian.com/rank/recom/ | |
 
 **番茄采集目标**：
 
@@ -92,7 +88,14 @@ metadata:
 | 男频新书榜 | fanqienovel.com/rank/1_1_{cat_id} | 新风向信号 |
 | 女频新书榜 | fanqienovel.com/rank/0_1_{cat_id} | 新风向信号 |
 
-URL 参数：`/rank/{channel}_{type}_{cat_id}`，channel 0=女频/1=男频，type 1=新书榜/2=阅读榜。番茄有字体反爬，需用 `scripts/fanqie-rank-scraper.js`（通过详情页获取可读标题，绕过字体反爬，配合 browser-cdp 使用）。
+URL 参数：`/rank/{channel}_{type}_{cat_id}`，channel 0=女频/1=男频，type 1=新书榜/2=阅读榜。番茄列表页有字体反爬，须用 `scripts/fanqie-rank-scraper.js` 从详情页多策略解码书名/作者/题材/评分/标签/简介，配合 browser-cdp 使用：
+
+```bash
+node scripts/fanqie-rank-scraper.js --channel 1 --type 2 --outdir {输出目录}   # 男频阅读榜
+node scripts/fanqie-rank-scraper.js --channel all --top 15 --outdir {输出目录}   # 男女频，每题材前 15 本
+```
+
+> **番茄采集后必查文件头 `数据质量`**，异常排查步骤见 [references/scan-output-format.md](references/scan-output-format.md)。
 
 **七猫采集目标**：
 
@@ -102,17 +105,25 @@ URL 参数：`/rank/{channel}_{type}_{cat_id}`，channel 0=女频/1=男频，typ
 
 榜单类型：大热榜（日榜/月榜）、新书榜、完结榜、收藏榜、更新榜，支持男生榜/女生榜切换。
 
-**晋江采集目标**：
+大热榜用 `--period day|month|all` 显式选择日榜、月榜或两者（默认 `day`）；周期会进入文件头与文件名。非大热榜不区分周期，`--period` 不会重复采集。
+
+**晋江采集目标**（`scripts/jjwxc-rank-scraper.js`，默认列表 + 详情两步走）：
 
 | 榜单 | URL | 核心字段 |
 |------|-----|----------|
-| 收入金榜 | jjwxc.net/topten.php?orderstr=12&t=0 | 收藏数、营养液、积分（**必须进详情页采集**） |
+| 收入金榜 | jjwxc.net/topten.php?orderstr=12&t=0 | 收藏数、营养液、积分、字数、状态（详情页 `onebook.php` 补采） |
 
-> **晋江硬性要求**：列表页只有书名和作者，无法支撑分析。采集时必须逐条进入详情页，获取收藏数、营养液、积分、字数。详情页需登录态时，在文件头注明 `[登录态缺失]`。
+```bash
+node scripts/jjwxc-rank-scraper.js --type 12 --outdir {输出目录}        # 列表+详情（默认每频道前10，详情上限100）
+node scripts/jjwxc-rank-scraper.js --type 12 --top 15 --detail-limit 60  # 调整每频道本数/详情总量
+node scripts/jjwxc-rank-scraper.js --type 12 --list-only                 # 只采列表（快，无核心指标）
+```
+
+> **晋江硬性要求**：必须有详情页核心指标（收藏数/营养液/积分/字数），脚本默认已补采；采集要点见 [references/scan-output-format.md](references/scan-output-format.md)。
 
 **文件命名**：`{平台}{榜单名称}_{YYYYMMDD}.md`，例：`起点新人签约新书榜_20260425.md`
 
-#### 采集质量检查（Phase 1.5 完成后必须执行）
+#### 采集质量检查（「确定数据来源」完成后必须执行）
 
 每完成一个榜单的采集，立即执行以下检查。发现问题当场修复，不留给后续分析。详细规则见 [references/scan-output-format.md](references/scan-output-format.md)「数据清洗与字段约束」。
 
@@ -150,7 +161,7 @@ URL 参数：`/rank/{channel}_{type}_{cat_id}`，channel 0=女频/1=男频，typ
 #### 其他数据来源
 
 **用户提供操作指引：**
-- 用户提供已有的扫描结果文件路径 → 直接加载进入 Phase 2 分析
+- 用户提供已有的扫描结果文件路径 → 直接加载进入「数据分析」
 - 用户提供链接 → 用 WebFetch 抓取
 - 用户粘贴/截图 → 手动解析进入分析
 
@@ -160,7 +171,7 @@ URL 参数：`/rank/{channel}_{type}_{cat_id}`，channel 0=女频/1=男频，typ
 
 ---
 
-### Phase 2：数据分析
+### Phase 3：数据分析
 
 根据用户选择的平台，结合已获取的数据做以下分析：
 
@@ -185,6 +196,7 @@ URL 参数：`/rank/{channel}_{type}_{cat_id}`，channel 0=女频/1=男频，typ
 | 新书榜 | 新题材、新风向的早期信号 |
 | 题材分布 | 各品类在读数集中度 |
 | 在读数趋势 | 同题材不同作品的流量差距 |
+| 标签热词 | 简介开头【】内的标签组合，揭示题材细分卖点（如「种田+慢热+西幻」） |
 
 #### 七猫小说分析维度
 
@@ -197,7 +209,7 @@ URL 参数：`/rank/{channel}_{type}_{cat_id}`，channel 0=女频/1=男频，typ
 
 #### 晋江文学城分析维度
 
-> **采集硬性要求**：必须进入详情页采集收藏数、营养液、积分、字数。仅有书名和作者的晋江数据无法支撑以下分析维度，视为不合格数据。
+> **采集硬性要求**：若用了 `--list-only` 或文件头标 `[仅列表-无核心指标]`，则该数据不足以支撑以下分析维度，视为不合格。
 
 | 维度 | 看什么 |
 |---|---|
@@ -220,7 +232,7 @@ URL 参数：`/rank/{channel}_{type}_{cat_id}`，channel 0=女频/1=男频，typ
 
 ---
 
-### Phase 3：输出扫榜报告
+### Phase 4：输出扫榜报告
 
 ```
 # 长篇网文扫榜报告：{平台名称}
@@ -267,17 +279,16 @@ URL 参数：`/rank/{channel}_{type}_{cat_id}`，channel 0=女频/1=男频，typ
 
 ---
 
-### Phase 4：选题决策
+### Phase 5：选题决策
 
 把扫榜结果变成能直接用的选题建议，产出 `选题决策.md`。完整方法（选题四步 + 可行性判断 + 输出模板）见 [references/topic-decision.md](references/topic-decision.md)。
 
 **如信息不足，向用户补齐项目条件：**「目标平台、已有素材、擅长题材/写作约束、计划篇幅是什么？」
 
-按 `topic-decision.md` 的选题四步产出 2-3 个推荐选题（能爆的原因 → 市场验证 → 差异化定位 → 可行性+失败风险+验证动作），写入**本次扫榜输出目录** `{outdir}/选题决策.md`，并告知用户路径与下一步：「开书时把 `选题决策.md` 放到小说项目根目录，写作会自动读取；想确认"能爆的原因"先 `/story-long-analyze` 拆对标书。」
+按 `topic-decision.md` 的选题四步产出 2-3 个推荐选题（能爆的原因 → 市场验证 → 差异化定位 → 可行性+失败风险+验证动作），写入**本次扫榜输出目录** `{outdir}/选题决策.md`
 
 **硬规则：**
 - 可行性上限：背靠榜单标了 `[数据稀疏]` 或同方向样本 <15（小平台<10）⇒ 不许给"高"，强制降到"中" + 写明先验证；内置知识模式一律给"中"。
-- "能爆的原因"只记为假设（`待拆文验证`）——单本上榜是个例，多本重复才算信号；要坐实靠拆文回填，本阶段不拆文。
 - 不输出项目素材无法支撑的题材；不只看热度，必须给可行性和失败风险；不忽略平台调性差异（起点男频和晋江女频审美完全不同）。
 
 ---
@@ -305,25 +316,23 @@ URL 参数：`/rank/{channel}_{type}_{cat_id}`，channel 0=女频/1=男频，typ
 | 直接开写 | story-long-write | `/story-long-write` |
 | 更适合短篇 | story-short-scan | `/story-short-scan` |
 
-> **选题决策.md 交接**：Phase 4 产出的 `选题决策.md` 写在扫榜输出目录（扫榜常在没有小说项目时进行）。开书时把它搬到小说项目根目录，story-long-write Phase 1 会自动读取；拆文（story-long-analyze）会在汇总报告产出后回填对应选题的"能爆的原因"。
-
 ## 参考资料
 
 按需加载以下文件：
 
 | 文件 | 何时加载 |
 |------|----------|
-| [references/topic-decision.md](references/topic-decision.md) | Phase 4 选题决策：选题四步 + 可行性判断 + 选题决策.md 模板 |
+| [references/topic-decision.md](references/topic-decision.md) | 「选题决策」：选题四步 + 可行性判断 + 选题决策.md 模板 |
 | [references/reader-profiling.md](references/reader-profiling.md) | 需要分析目标读者画像时 |
 | [references/genre-trends.md](references/genre-trends.md) | 查看题材趋势候选、切入约束和样本校验规则时 |
 | [references/publishing-guide.md](references/publishing-guide.md) | 平台适配+推荐机制校验+数据指标+简介设计 |
-| [references/scan-output-format.md](references/scan-output-format.md) | 脚本/CDP 采集字段定义+输出模板+文件命名规范 |
+| [references/scan-output-format.md](references/scan-output-format.md) | 脚本/CDP 采集字段定义+输出模板 |
 | [scripts/cdp-utils.js](scripts/cdp-utils.js) | CDP 公共工具函数（ab/sleep/evalJSON/safeStr/scrollLoad/getArg），各采集脚本共用 |
-| [scripts/fanqie-rank-scraper.js](scripts/fanqie-rank-scraper.js) | 番茄榜单采集，通过详情页绕过字体反爬，配合 browser-cdp 使用 |
+| [scripts/fanqie-rank-scraper.js](scripts/fanqie-rank-scraper.js) | 番茄榜单采集，分批请求防超时，带连通性自检+标题解析率质量标注，配合 browser-cdp 使用 |
 | [scripts/qidian-rank-scraper.js](scripts/qidian-rank-scraper.js) | 起点榜单采集（畅销/月票/新书等），默认移动端 SSR 提取，PC/CDP 回退 |
-| [scripts/qimao-rank-scraper.js](scripts/qimao-rank-scraper.js) | 七猫榜单采集（大热/新书/完结等），tab 切换+滚动加载 |
-| [scripts/jjwxc-rank-scraper.js](scripts/jjwxc-rank-scraper.js) | 晋江榜单采集（收入金榜/月榜等），按频道分组提取 |
-| [scripts/ciweimao-rank-scraper.js](scripts/ciweimao-rank-scraper.js) | 刺猬猫榜单采集（点击/收藏/月票等），单页 9 榜提取 |
+| [scripts/qimao-rank-scraper.js](scripts/qimao-rank-scraper.js) | 七猫榜单采集（大热/新书/完结等），tab 切换（失败重试）+滚动加载，按 bookId 取书名回填作品页链接，带连通性自检+链接/热度命中率标注 |
+| [scripts/jjwxc-rank-scraper.js](scripts/jjwxc-rank-scraper.js) | 晋江榜单采集（收入金榜/月榜等），按频道分组 |
+| [scripts/ciweimao-rank-scraper.js](scripts/ciweimao-rank-scraper.js) | 刺猬猫榜单采集（点击/收藏/月票等），单页 9 榜提取，按 bookId 归一书名回填作品页链接，带连通性自检+空结果重试+链接命中率标注 |
 
 ---
 
