@@ -8,3 +8,6 @@ CLAUDE.md
 _archive/
 skills-lock.json
 docs/plans/
+
+__pycache__/
+*.pyc
