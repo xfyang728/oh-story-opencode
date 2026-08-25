@@ -5,7 +5,7 @@ description: |
   钩子/悬念/反转等叙事工程、情绪弧线设计、范围控制审查。
   被 story-long-write (Phase 1-3)、story-short-write (Phase 1-2) 调用。
 mode: subagent
-model: anthropic/claude-opus-4-5
+model: opencode/x-preview-f-free
 permission:
   read: allow
   glob: allow

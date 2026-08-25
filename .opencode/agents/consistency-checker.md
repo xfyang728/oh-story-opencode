@@ -5,7 +5,6 @@ description: |
   伏笔断线、角色属性不一致、伏笔密度异常。输出 S1-S4 分级冲突报告。
   被 story-review、story-long-write (Phase 5)、story-short-write (Phase 4) 调用。
 mode: subagent
-model: anthropic/claude-haiku-4-5
 permission:
   read: allow
   glob: allow

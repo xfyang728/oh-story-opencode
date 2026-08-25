@@ -5,7 +5,7 @@ description: |
   情绪弧线执行、开篇/收尾、去AI味（禁用词替换、句式去套路、节奏打碎）。
   被 story-long-write (Phase 4-5) 和 story-short-write (Phase 3-4) 调用。
 mode: subagent
-model: anthropic/claude-sonnet-4-6
+model: opencode/x-preview-f-free
 permission:
   read: allow
   glob: allow

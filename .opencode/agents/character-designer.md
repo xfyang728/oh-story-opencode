@@ -4,7 +4,7 @@ description: |
   角色设计与对话创作专家。负责角色设定、语言风格档案、动机链、人物弧线、
   对话质量、角色关系设计。被 story-long-write (Phase 2,4) 和 story-short-write (Phase 2,3) 调用。
 mode: subagent
-model: anthropic/claude-sonnet-4-6
+model: opencode/x-preview-f-free
 permission:
   read: allow
   glob: allow

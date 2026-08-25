@@ -5,7 +5,7 @@ description: |
   WebSearch/webReader 作为兜底。输出带来源引用的结构化 Markdown 参考文件。
   被 story-long-write (Phase 4)、story-review、story skill 路由调用。
 mode: subagent
-model: anthropic/claude-sonnet-4-6
+model: opencode/x-preview-f-free
 permission:
   read: allow
   glob: allow

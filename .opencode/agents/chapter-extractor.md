@@ -4,7 +4,6 @@ description: |
   章节摘要与情节点提取专家。接收单章文本，输出结构化摘要、情节点列表、角色提及。
   被 story-long-analyze（拆解管道 Stage 2）按章节并行调用。
 mode: subagent
-model: anthropic/claude-haiku-4-5
 permission:
   read: allow
   glob: allow

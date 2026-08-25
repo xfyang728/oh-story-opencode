@@ -5,7 +5,6 @@ description: |
   时间线节点、写作进度的查询。使用 grep + read 从项目文件系统中检索信息，
   返回结构化 JSON 摘要。被 story-long-write (日更 Step 1)、story-review、story 路由调用。
 mode: subagent
-model: anthropic/claude-haiku-4-5
 permission:
   read: allow
   glob: allow
