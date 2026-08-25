@@ -20,6 +20,7 @@
 | `/story-import`、`/导入` | story-import | 逆向导入已有小说到项目结构 |
 | `/story`、`/网文` | story | 工具箱路由 · 模糊意图自动分发 |
 | `/story-setup`、`/准备写书` | story-setup | 环境部署 · agents/rules 一键部署 |
+| `/story-fanqie-upload`、`/发番茄` | story-fanqie-upload | 番茄小说批量存草稿 · CDP 浏览器自动化 |
 | `/browser-cdp` | browser-cdp | 浏览器 CDP 工具 |
 
 ## 文件结构

@@ -132,7 +132,7 @@ metadata:
   - 保留字段：`name`（必须），`description`，`model`
   - 添加字段：`mode: subagent`, `permission`（按 tools 映射）
   - 去掉不兼容字段：`tools`, `memory`, `skills`, `disallowedTools`, `maxTurns`
-  - **`model` 转换**：opus→anthropic/claude-opus-4-5, sonnet→anthropic/claude-sonnet-4-6, haiku→anthropic/claude-haiku-4-5（注意：此映射需随 Anthropic 模型版本更新而维护）
+  - **`model` 转换**：opus→anthropic/claude-opus-4-5, sonnet→anthropic/claude-sonnet-4-6, haiku→anthropic/claude-haiku-4-5（注意：此映射需随 Anthropic 模型版本更新而维护）；若部署环境 spawn 报 Model not found（如 opencode 托管模型），删除 model 行继承会话默认，或改用该环境实测可用 ID（本项目实测：opencode/x-preview-f-free）
   - `tools` 映射为 `permission`（Read→read: allow, Write→write: allow, disallowedTools→deny）
 - 如 `.opencode/agents/` 已存在 agent 文件，按 `.story-deployed` 的 agents_version 决定是否覆盖
 
