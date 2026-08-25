@@ -226,6 +226,13 @@ Task(
 - 主线程将 agent 输出写入 `章节/第{N}章_摘要.md`
 - 收集所有 agent 的出场人物表，供 Stage 3 合并使用
 
+### 门控自动化（lane 结果磁盘复核）
+
+「lane 返回 completed 但落盘为空」是高频故障，两条硬性防线：
+
+1. **fixer lane prompt 必须附带 verify_gates 校验步骤**：spawn chapter-extractor 等 lane 的 prompt 模板强制包含落盘后自查——文件已写入且非空、情节点数达标、`grep -c '基调：'` == 情节点数；自查不过 lane 不得返回 completed
+2. **orchestrator 必须磁盘复核**：收到 lane 结果后不看自报状态直接复核磁盘——摘要文件数 == 章节数（`章节/*_摘要.md` 计数比对 `_progress.md` 章节边界表）；不等则标记失败章节并重试，禁止凭 lane 自报 completed 推进 Stage 3
+
 ### 失败处理 + 质量升级重试
 
 **两类失败**：
@@ -241,10 +248,10 @@ Task(
 
 ```python
 # 使用 Task 工具 spawn chapter-extractor 子代理
-# 注：OpenCode Task tool 的 model 参数兼容性需验证；如不支持，改用 sonnet-model 版本的 agent
+# 注：model 覆盖必须用当前环境实测可用 ID；anthropic/-前缀 ID 实测报 Model not found
 Task(
   subagent_type: "chapter-extractor",
-  model: "anthropic/claude-sonnet-4-6",  # 显式覆盖 frontmatter 的 haiku
+  model: "opencode/x-preview-f-free",  # 实测可用；升级语义由 prompt 追加「上次校验失败原因」承担
   prompt: "章节编号：第{N}章\n...（同首次 prompt，可追加：'上次校验失败原因：{自检失败项}'）"
 )
 ```

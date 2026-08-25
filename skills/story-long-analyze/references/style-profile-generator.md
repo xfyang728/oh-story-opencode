@@ -26,6 +26,14 @@
 
 ### Step 3: 提取章节基调/主题标签序列
 
+> **优先路径**：先调用 skill 自带统计脚本 `references/scripts/style_stats.py`：
+>
+> ```bash
+> py references/scripts/style_stats.py book 拆文库/{书名} --json /tmp/style_stats.json
+> ```
+>
+> 输出字段：chapters / plot_points / avg_per_ch / tone_dist / theme_top / intra_switch_rate / other_attribution_warning / chapter_mode_sequence——其中 `chapter_mode_sequence` 即下文「章基调聚合规则」的产物，可直接消费。脚本不存在或运行失败时，退回下面的手工 Grep 流程（降级路径，结果等价）。
+
 用 Grep 读所有 `章节/*_摘要.md`：
 
 ```bash
@@ -72,6 +80,8 @@ grep -nE '^第[一二三四五六七八九十百千两零0-9]+章' 原文/原文
 
 **确定性句长/标点统计**（替代旧版「眼测」）：
 
+> **优先路径**：句长/标点统计同样优先由 `references/scripts/style_stats.py` 的 `book` 子命令承担（输出已含所需指标）；仅当脚本不可用时才用下面的手工 Python 统计。
+
 Stage 6 由**主线程**执行，Bash 工具可用。把上一步拼好的 `/tmp/style-sample.txt` 喂给下面的脚本（heredoc 作 Python 源，脚本内 open 样本文件，避免 stdin heredoc 与 `< file` 双重重定向冲突）。先探测可用解释器再跑——**勿直接用 `python3`**，Windows 上它会触发 Microsoft Store 占位程序、exit 49 失败：
 
 ```bash
@@ -117,6 +127,7 @@ PYEOF
 - 该章原文从中选 1 段 300-500 字（优先选对话+动作交织的段落，纯独白/纯设定段不选）
 - 用 `Read offset limit` 切出，保留原标点和段落断行
 - **锚点必须逐字连续切片，禁止改写/缩写/跳段/拼接**：narrative-writer 拿锚点当 few-shot 直接学，标注的行号要能回查原文。落盘前逐段抽 1-2 句 `grep -F` 回 `原文/原文.txt`，grep 不到即说明被改写或拼接——重切为忠实连续片段。确需跳过中间过渡段时，分别标各自真实行号（如「行264-267 + 行269-270」）并在引用块内用「（……中略……）」显式断开，不得用一个连续行号区间假装连续
+- **行号出处硬要求**：每个锚点的「出处」必须落到「第N章·行X-Y」粒度；无行号出处的锚点片段一律降级 `confidence: low`
 
 ### Step 6: 落盘
 
@@ -129,6 +140,27 @@ PYEOF
   - `low`：样本不足或采样失败（如锚点缺失、Bash 不可用导致 Step 4 句长统计跳过）
 - 字数预算：硬上限 ~4000 字。**描述段 ≤ 1500 字 + 锚点 4-6 段 × 300-500 字**
 - 如果 Step 4 失败（章节分隔符识别不出）→ 「生成记录」写 `文风可用：否：无法识别章节分隔符`；原文锚点段全填占位符 "原文缺失，需手动补充"，confidence 全 low
+
+## 跨书对比模式
+
+输入 ≥2 个拆文库目录时（用户要求横向对比多本书），在单书文风之外追加产出对比矩阵：
+
+```bash
+py references/scripts/style_stats.py compare 拆文库/{书A} 拆文库/{书B} ...
+```
+
+产出四张表 + 情绪引擎定性：
+
+| 表 | 内容 |
+|----|------|
+| 基调分布 | 各书 tone_dist 并排（占全部情节点 %） |
+| 主题标签 Top4 | 各书 theme_top 对齐排序 |
+| 密度指标 | 各书 avg_per_ch（章均情节点）对照 |
+| 切换率 | 各书 intra_switch_rate 对照，注明切换发生在章内还是章间 |
+
+情绪引擎定性（据基调配比 + 切换率给每书标一类）：喜剧缓冲型（轻松独大 + 低切换）/ 高压权谋型（紧张+压抑合计过半）/ 均衡换挡型（紧张为主 + 缓冲充足 + 高切换）。
+
+**「其他」基调归因规则**：跨书对比前，任一书「其他」基调占比 >15%（`other_attribution_warning` 触发）时，必须先做归因分析（典型：【】面板文字等非叙事行混入基调统计）并在对比表加脚注注明；未归因前禁止单调分布直接排名——否则会误读为该书情绪更平淡。
 
 ## 失败模式与降级
 
