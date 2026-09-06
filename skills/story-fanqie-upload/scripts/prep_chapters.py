@@ -33,7 +33,7 @@ def main():
             raise SystemExit(f"第{i}章: 匹配到 {len(files)} 个文件，预期 1 个")
         raw = files[0].read_text(encoding="utf-8")
         lines = raw.split("\n")
-        if not lines[0].startswith("# "):
+        if not lines[0].startswith("# ") and not re.match(r"^第\s*\d+\s*章", lines[0].strip()):
             raise SystemExit(f"{files[0].name}: 首行不是 '# ' 标题")
         title = lines[0].lstrip("# ").strip()
         body = "\n".join(lines[1:]).strip()
