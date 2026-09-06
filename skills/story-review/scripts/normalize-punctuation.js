@@ -4,17 +4,17 @@
 const fs = require('fs');
 const path = require('path');
 
-const USAGE = `Usage: node normalize-punctuation.js [--check] [--quote-mode keep|ascii|yan] <file...>
+const USAGE = `Usage: node normalize-punctuation.js [--check] [--quote-mode keep|curly|ascii|yan] <file...>
 
 Normalize正文 punctuation deterministically:
   - replace em dashes / double hyphens with Chinese punctuation
   - remove markdown divider lines (---) from正文
-  - keep quote style by default; convert quotes only when explicitly requested
+  - curly by default: corner brackets and straight quotes become paired curly quotes; use --quote-mode keep to preserve
 `;
 
 const options = {
   check: false,
-  quoteMode: 'keep',
+  quoteMode: 'curly',
   files: [],
 };
 
@@ -24,7 +24,7 @@ for (let i = 2; i < process.argv.length; i += 1) {
     options.check = true;
   } else if (arg === '--quote-mode') {
     const value = process.argv[i + 1];
-    if (!value) die('--quote-mode requires keep, ascii, or yan');
+    if (!value) die('--quote-mode requires keep, curly, ascii, or yan');
     options.quoteMode = value;
     i += 1;
   } else if (arg.startsWith('--quote-mode=')) {
@@ -39,7 +39,7 @@ for (let i = 2; i < process.argv.length; i += 1) {
   }
 }
 
-if (!['keep', 'ascii', 'yan'].includes(options.quoteMode)) {
+if (!['keep', 'curly', 'ascii', 'yan'].includes(options.quoteMode)) {
   die(`Invalid --quote-mode: ${options.quoteMode}`);
 }
 if (options.files.length === 0) {
@@ -236,8 +236,39 @@ function normalizeQuotes(line, quoteMode, quoteOpen, lineNo) {
     return { line, findings: [], quoteOpen };
   }
 
+
   const findings = [];
   let output = '';
+
+  if (quoteMode === 'curly') {
+    for (let i = 0; i < line.length; i += 1) {
+      const ch = line[i];
+      if (ch === '「' || (ch === '"' && !quoteOpen)) {
+        output += '“';
+        quoteOpen = true;
+        findings.push({ line: lineNo, column: i + 1, type: 'quote-style', message: '对话引号统一为半角双引号 “”。' });
+        continue;
+      }
+      if (ch === '」' || (ch === '"' && quoteOpen)) {
+        output += '”';
+        quoteOpen = false;
+        findings.push({ line: lineNo, column: i + 1, type: 'quote-style', message: '对话引号统一为半角双引号 “”。' });
+        continue;
+      }
+      if (ch === '『') {
+        output += '‘';
+        findings.push({ line: lineNo, column: i + 1, type: 'quote-style', message: '内层引号统一为单弯引号 ‘’。' });
+        continue;
+      }
+      if (ch === '』') {
+        output += '’';
+        findings.push({ line: lineNo, column: i + 1, type: 'quote-style', message: '内层引号统一为单弯引号 ‘’。' });
+        continue;
+      }
+      output += ch;
+    }
+    return { line: output, findings, quoteOpen };
+  }
 
   for (let i = 0; i < line.length; i += 1) {
     const ch = line[i];

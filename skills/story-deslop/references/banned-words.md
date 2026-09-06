@@ -139,7 +139,7 @@ sync-source: skills/story-setup/references/agent-references/banned-words.md
 ❌ 错误：「你来了。」
 ✅ 正确："你来了。"
 
-> 唯一例外：知乎盐言故事平台要求使用直角引号「」，仅限该平台。
+> 无平台例外：所有平台（含知乎盐言）的正文写作一律使用半角双引号 `""`，禁止「」/`『』`。
 
 ---
 
