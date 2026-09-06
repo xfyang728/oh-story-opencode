@@ -355,7 +355,7 @@ node scripts/normalize-punctuation.js <正文文件...>
 - 它只是读感提示；完整类别、例外和修法见 `references/anti-ai-writing.md`。
 - `check-degeneration.js` 报告模型退化（逐字复读/打转、末尾截断、占位符、工程词泄漏 `细纲`/`情节点` 等），每条带 `severity: blocking|advisory`。blocking 是退化信号，去AI味改不掉，应回去重新生成那一段再 deslop；advisory（tier2 章节/歧义词）只提示。
 - `normalize-punctuation.js` 机械兜底：清除残留的 `……`、漏网破折号 `——`/`—`、双连字符 `--` 和独立行 `---`；默认不改变引号风格，也不把有功能的 `？` / 少量 `！` 改成句号。
-- 知乎盐言短篇可保留 `「」`；只有用户或项目明确要求时，才给标点脚本加 `--quote-mode ascii` 或 `--quote-mode yan`。
+- 对话引号一律转为半角双引号 `""`（含知乎盐言短篇）；仅当用户明确要求保留原样时才加 `--quote-mode keep`。
 
 ---
 
