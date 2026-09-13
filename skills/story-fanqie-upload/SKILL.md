@@ -62,7 +62,8 @@ catch { Write-Output "CDP 启动失败" }
 | 作家工作台 | `https://fanqienovel.com/main/writer/home` |
 | 章节管理 | `https://fanqienovel.com/main/writer/chapter-manage/{book_id}&type=1` |
 | 新建章节 | `https://fanqienovel.com/main/writer/{book_id}/publish/?enter_from=newchapter_0` |
-| 编辑已有草稿 | `https://fanqienovel.com/main/writer/{book_id}/publish/{draft_id}?enter_from=newchapter_0` |
+| 编辑已有章节 | `https://fanqienovel.com/main/writer/{book_id}/publish/{draft_id}?enter_from=modifychapter` |
+| 编辑草稿 | `https://fanqienovel.com/main/writer/{book_id}/publish/{draft_id}?enter_from=modifydraft` |
 
 `book_id` 从工作台页面链接提取（章节管理/创建章节的 href 里都带）。
 
@@ -133,6 +134,133 @@ $ok = $true; foreach ($i in 38..57) {
 agent-browser --cdp 9222 open "https://fanqienovel.com/main/writer/chapter-manage/<book_id>&type=1"
 # 等待加载 → 点击草稿箱 → 逐章核对字数
 ```
+
+## 定时发布工作流
+
+章节上传为草稿后，需逐章走发布流程设置定时发布时间。**每章独立操作，不可跳步。**
+
+### 单章发布流程（7 步）
+
+```
+编辑页 → 下一步 → [提交] → 仅基础检测 → 设置发布参数 → 确认发布
+```
+
+#### Step 1：打开编辑页
+
+草稿编辑 URL 格式：`https://fanqienovel.com/main/writer/{book_id}/publish/{draft_id}?enter_from=modifydraft`
+
+获取草稿编辑链接：
+
+```powershell
+agent-browser --cdp 9222 open "https://fanqienovel.com/main/writer/chapter-manage/<book_id>&type=1"
+agent-browser --cdp 9222 wait 3000
+# 点击「草稿箱」tab
+agent-browser --cdp 9222 snapshot -i
+# 从 snapshot 找到草稿箱 tab ref，点击
+agent-browser --cdp 9222 click "@e{tab_ref}"
+agent-browser --cdp 9222 wait 3000
+# 提取所有草稿编辑链接
+agent-browser --cdp 9222 eval "JSON.stringify([...document.querySelectorAll('a[href*=\"modifydraft\"]')].map(a=>({ch:a.closest('tr')?.querySelector('td')?.textContent?.trim()||'?',href:a.href})))"
+```
+
+#### Step 2：点击「下一步」
+
+```powershell
+agent-browser --cdp 9222 open "<编辑页URL>"
+agent-browser --cdp 9222 wait 5000
+agent-browser --cdp 9222 eval "[...document.querySelectorAll('button')].find(b=>b.textContent.includes('下一步')).click()"
+agent-browser --cdp 9222 wait 2000
+```
+
+#### Step 3：处理「提交」确认弹窗（可能不出现）
+
+若检测到错别字/风险内容，会弹出「发布提示」对话框：
+
+```powershell
+agent-browser --cdp 9222 eval "[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='提交')?.click()"
+agent-browser --cdp 9222 wait 3000
+```
+
+#### Step 4：选择「仅基础检测」
+
+弹出「请选择内容检测方式」对话框：
+
+```powershell
+agent-browser --cdp 9222 eval "[...document.querySelectorAll('button')].find(b=>b.textContent.includes('仅基础检测')).click()"
+agent-browser --cdp 9222 wait 3000
+```
+
+#### Step 5：设置发布参数
+
+发布设置弹窗包含：AI 标记、定时发布开关、日期选择器、时间选择器。
+
+```powershell
+# 5a) 勾选「是否使用AI=是」
+agent-browser --cdp 9222 eval "(function(){const r=[...document.querySelectorAll('input[type=radio]')].find(r=>r.parentElement&&r.parentElement.textContent.includes('是'));if(r)r.click();return 'ai';})()"
+agent-browser --cdp 9222 wait 500
+
+# 5b) 开启「定时发布」开关（关闭状态时需点击开启）
+agent-browser --cdp 9222 eval "(function(){const s=[...document.querySelectorAll('[role=switch]')].find(s=>s.parentElement?.textContent?.includes('定时发布'));if(s&&s.getAttribute('aria-checked')!=='true')s.click();return 'sw';})()"
+agent-browser --cdp 9222 wait 1000
+
+# 5c) 设置日期 — 点击日期输入框 → 在日历中点击目标日
+agent-browser --cdp 9222 eval "(function(){const d=document.querySelector('input[placeholder*=\"日期\"]');if(d)d.click();return 'dc';})()"
+agent-browser --cdp 9222 wait 500
+agent-browser --cdp 9222 eval "(function(){const cells=[...document.querySelectorAll('[class*=cell]')];const t=cells.find(c=>c.textContent.trim()==='DD'&&!c.className.includes('prev')&&!c.className.includes('next'));if(t)t.click();return 'ok';})()"
+agent-browser --cdp 9222 wait 500
+# ⚠️ 将 DD 替换为目标日期的日（如14、15、16、17）
+
+# 5d) 设置时间 — 点击时间输入框 → 选择小时00 → 选择分钟01 → 点确定
+agent-browser --cdp 9222 eval "(function(){const t=document.querySelector('input[placeholder*=\"时间\"]');if(t)t.click();return 'tc';})()"
+agent-browser --cdp 9222 wait 500
+agent-browser --cdp 9222 eval "(function(){const items=[...document.querySelectorAll('li')];const h=items.find((li,i)=>li.textContent==='00'&&i<24);if(h)h.click();return 'hr';})()"
+agent-browser --cdp 9222 wait 300
+agent-browser --cdp 9222 eval "(function(){const items=[...document.querySelectorAll('li')];const m=items.filter(li=>li.textContent==='01');if(m.length>1)m[1].click();else if(m[0])m[0].click();return 'mn';})()"
+agent-browser --cdp 9222 wait 300
+agent-browser --cdp 9222 eval "[...document.querySelectorAll('button')].find(b=>b.textContent.includes('确定')).click()"
+agent-browser --cdp 9222 wait 500
+```
+
+#### Step 6：验证参数
+
+```powershell
+agent-browser --cdp 9222 eval "JSON.stringify({d:document.querySelector('input[placeholder*=\"日期\"]')?.value,t:document.querySelector('input[placeholder*=\"时间\"]')?.value})"
+# 期望输出：{"d":"2026-09-15","t":"00:01"}
+```
+
+#### Step 7：确认发布
+
+```powershell
+agent-browser --cdp 9222 eval "[...document.querySelectorAll('button')].find(b=>b.textContent.includes('确认发布')).click()"
+agent-browser --cdp 9222 wait 5000
+# 验证：页面应回到章节管理页，该章显示「审核中」+ 正确时间
+agent-browser --cdp 9222 eval "document.body.innerText.substring(0, 500)"
+```
+
+### 批量定时发布脚本
+
+逐章执行上述 7 步。每章约 30–40 秒，12 章约 6–8 分钟。
+
+```powershell
+# 示例：70-81 章定时发布（每天3章，00:01 发布）
+$chapters = @(
+  @{ch=70; date="2026-09-14"}, @{ch=71; date="2026-09-14"},
+  @{ch=72; date="2026-09-15"}, @{ch=73; date="2026-09-15"}, @{ch=74; date="2026-09-15"},
+  @{ch=75; date="2026-09-16"}, @{ch=76; date="2026-09-16"}, @{ch=77; date="2026-09-16"},
+  @{ch=78; date="2026-09-17"}, @{ch=79; date="2026-09-17"}, @{ch=80; date="2026-09-17"}, @{ch=81; date="2026-09-17"}
+)
+# 对每个 $c 执行 Step 1-7
+```
+
+### 定时发布坑位
+
+| 坑 | 现象 | 对策 |
+|----|------|------|
+| 日历选择器遮挡确认按钮 | 设置日期后日历面板仍在，点击确认会被日历拦截 | 先点击日历中的目标日期（关闭面板），再点确认 |
+| 定时发布开关未开启 | 发布参数区不显示日期/时间输入框 | 检查 `[role=switch]` 的 `aria-checked`，未开启则点击 |
+| 时间选择器列歧义 | 小时和分钟都显示00-23/00-59，选择分钟01时可能选到小时列 | 分钟列用 `filter(li=>li.textContent==='01')` 取第二个（`m[1]`） |
+| 草稿编辑链接格式 | 草稿是 `modifydraft`，已发布章节是 `modifychapter` | 提取链接时注意区分 `enter_from` 参数 |
+| 「提交」弹窗不一定出现 | 无错别字/风险时直接跳到检测方式选择 | 用 `?.click()` 安全调用，不报错即可 |
 
 ## 字数核验规则
 
