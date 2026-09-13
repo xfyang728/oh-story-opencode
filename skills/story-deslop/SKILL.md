@@ -3,6 +3,7 @@ name: story-deslop
 version: 1.0.0
 description: "网文去AI味。检测并清除文本中的AI写作痕迹，让文字回归自然、非模板化。触发方式：/story-deslop、/去AI味、「去AI味」「这篇太AI了」「网文去AI味」。"
 metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudecode"}}
+agent_created: true
 ---
 # story-deslop：网文去AI味
 
@@ -354,7 +355,9 @@ node scripts/normalize-punctuation.js <正文文件...>
 - `check-ai-patterns.js` 只报告不改写：severity=blocking 的类别优先改正文并复扫；advisory 先通读判断，确属提纲感、解释腔或模板腔再改，功能性写法标 `[需复核]`。
 - 它只是读感提示；完整类别、例外和修法见 `references/anti-ai-writing.md`。
 - `check-degeneration.js` 报告模型退化（逐字复读/打转、末尾截断、占位符、工程词泄漏 `细纲`/`情节点` 等），每条带 `severity: blocking|advisory`。blocking 是退化信号，去AI味改不掉，应回去重新生成那一段再 deslop；advisory（tier2 章节/歧义词）只提示。
-- `normalize-punctuation.js` 机械兜底：清除残留的 `……`、漏网破折号 `——`/`—`、双连字符 `--` 和独立行 `---`；默认不改变引号风格，也不把有功能的 `？` / 少量 `！` 改成句号。
+- `normalize-punctuation.js` 机械兜底：清除残留的 `……`、漏网破折号 `——`/`—`、双连字符 `--` 和独立行 `---`；默认不改变引号风格
+  - **`--keep-ellipsis`**：当 `文风.md` 的 `ellipsis_per_kilo` 基线非零（作者本人就用省略号）时**必须加此开关**——该脚本默认把 `……` 当无功能标点清掉，而作者用省略号时它是语气武器（实测某书作者 `……` 1582 次 / 1.28 每千字）。
+  - 破折号 `——` 与双连字符 `--` 无作者基线例外，仍按功能改写（见 `banned-words.md`）。，也不把有功能的 `？` / 少量 `！` 改成句号。
 - 对话引号一律转为半角双引号 `""`（含知乎盐言短篇）；仅当用户明确要求保留原样时才加 `--quote-mode keep`。
 
 ---

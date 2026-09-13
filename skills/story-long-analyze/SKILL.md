@@ -3,6 +3,7 @@ name: story-long-analyze
 version: 1.0.0
 description: "长篇网文拆文。深度拆解爆款长篇小说的黄金三章、人设架构、爽点设计、节奏控制。单一深度拆解管道：跑完黄金三章（Stage 1）后产出快速预览报告并询问是否继续全量拆解，确认后从 Stage 2 续跑逐章摘要、聚合分析、设定关系、汇总报告，全程产物落盘 拆文库/{书名}/。触发方式：/story-long-analyze、/长篇拆文、「帮我拆这本书」「拆这本书」「分析黄金三章」「深度拆解」「完整拆解」「系统拆解」或提供小说文本文件路径——全部进入同一管道。"
 metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudecode"}}
+agent_created: true
 ---
 # story-long-analyze：长篇网文拆文
 
@@ -329,7 +330,8 @@ Stage 3-5 分块见 [material-decomposition.md](references/material-decompositio
 | [references/pipeline-ops.md](references/pipeline-ops.md) | 管道运维：_progress.md 模板、错误处理、恢复机制操作步骤 |
 | [references/deconstruction-notes.md](references/deconstruction-notes.md) | 拆书方法+影视拆解+抽象拆解法+题材实战 |
 | [references/style-profile-protocol.md](references/style-profile-protocol.md) | Stage 6：文风模板 + 可信度/可用性说明 |
-| [references/style-profile-generator.md](references/style-profile-generator.md) | Stage 6：文风生成 SOP（6 步，含中文数字章节识别 + 全角冒号基调 grep） |
+| [references/style-profile-generator.md](references/style-profile-generator.md) | Stage 6：文风生成 SOP（含中文数字章节识别 + 全角冒号基调 grep + **Step 4 滚动基线 / Step 4b 指纹词 / Step 4c 定式场景模板**） |
+| [references/style-set-piece-templates.md](references/style-set-piece-templates.md) | Stage 6 配套：**定式场景节拍模板**（入新场／开新地图与新规则／队伍汇合／强者立威／人情交换）——解决"句长指标全合格但一段戏不像本书" |
 
 ---
 

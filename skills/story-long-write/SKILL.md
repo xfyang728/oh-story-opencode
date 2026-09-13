@@ -3,6 +3,7 @@ name: story-long-write
 version: 1.0.0
 description: "长篇网文写作。从大纲到正文，辅助长篇网络小说的创作，包括世界观、人物、情节线管理。触发方式：/story-long-write、/写长篇、「帮我开书」「写大纲」「日更」「续写」「继续写」「修改第X章」「回炉」「重写第X章」。"
 metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudecode"}}
+agent_created: true
 ---
 # story-long-write：长篇网文写作
 
@@ -300,9 +301,16 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 | 场景 | 加载文件 |
 |------|---------|
 | 质量检查 | `references/quality-checklist.md` + `references/reader-contract-and-progression.md` |
-| 禁用词扫描 | `references/banned-words.md` |
+| **文风偏离门（必须像谁）** | **`scripts/style-metrics.js`**（读 `文风.md` 的双层基线：全书兜底 + 滚动准绳；±15% 只卡下限；**段落长尾 ≥80 字 / ≥60 字且 ≥5 拍为绝对 blocking**；`--backfill` 可补缺失基线） |
+| 禁用词扫描（不许写什么） | `references/banned-words.md`（**先按「判定优先级」判级**：组合级硬禁、单字级可被作者指纹词豁免） |
 | AI句式脚本复扫 | `scripts/check-ai-patterns.js` |
+| **段落呼吸 + 退化防护** | **`scripts/check-degeneration.js`**（写后 hook 每次跑；含长段提醒与长段成片 advisory） |
 | 去AI味 | `references/anti-ai-writing.md` |
+
+> **Phase 5 的两条线不能互相取消**：`check-ai-patterns.js` 管"不许写什么"（组合句式，blocking），
+> `style-metrics.js` 管"必须像谁"（双层指标带 + 作者指纹词 + 段落长尾，blocking）。冲突时**先满足文风基线**，
+> 再在基线之内清 AI 味——反过来做就会写出"干净但不像这本书"的文本。
+> **段落长尾是第三条命门**：平均段长骗人（实测作者与 AI 续写只差 1.7 字，而 60+ 字段占比差 4 倍）。
 
 ### 按主题快速定位（横切主题）
 
@@ -319,7 +327,8 @@ metadata: {"openclaw":{"source":"https://github.com/zenstory-ai/oh-story-claudec
 | 反转 | **`references/reversal-toolkit.md`**（反转类型/铺垫/有效性自检） | `references/plot-core-methods.md`（假胜：先给希望再击碎） |
 | 人物 | **`references/character-basics.md`**（主角/配角/反派/动机模板速填） | `references/character-design-methods.md`（三层标签反差/九维深化）· `references/character-relations.md`（关系类型/感情线） |
 | 女频写作 | **`references/female-audience-writing.md`**（女频长篇：核心原则/文案/题材/感情线长线/平台） | `references/genre-readers.md`（读者心理/平台差异）· `references/character-relations.md`（感情线总框架） |
-| 去AI味 | **`references/anti-ai-writing.md`**（AI指纹/核心规则/Show Don't Tell） | `references/banned-words.md`（禁用词扫描）· `references/quality-checklist.md`（成稿检查） |
+| 去AI味 | **`references/anti-ai-writing.md`**（AI指纹/核心规则/Show Don't Tell） | `references/banned-words.md`（禁用词扫描，**先判组合级/单字级**）· `references/quality-checklist.md`（成稿检查） |
+| **像不像作者（文风对齐）** | **`scripts/style-metrics.js`**（指标带 + 作者指纹词双校验） | 指标带与白名单的**定义**在 `{对标书}/文风.md`（由 analyze Stage 6 产出，字段规范见 `story-long-analyze/references/style-profile-protocol.md`）· 生成方法见 `style-profile-generator.md` Step 4b · 冲突裁决见 `narrative-writer` 的「文风优先级」表 |
 
 ---
 

@@ -376,12 +376,25 @@ function scanProsePatterns(proseLines) {
     const dashPattern = /——|—|--+/g;
     let dash;
     while ((dash = dashPattern.exec(text)) !== null) {
+      // v4（A3）：让脚本与 banned-words.md 的「作者基线例外」一致——
+      // 当破折号承载**象声词**或**内心独白**时，作者本人大量使用（实测某书 `嗡——/啵——/铛——/嘶——`
+      // 与「他在心底…洗脑——我想要的，是第一！」），属有效用法，降为 advisory。
+      // 其余（打断、替代逗号/句号的停顿）仍判 blocking。
+      const before = text.slice(Math.max(0, dash.index - 6), dash.index);
+      const after = text.slice(dash.index + dash[0].length, dash.index + dash[0].length + 12);
+      const isOnomatopoeia = /[嗡啵铛嘶砰隆沙哗哧嗤嗷]/.test(before);
+      const isInnerMonologue = /(心底|心里|暗自|默默|不断|默念|念了|洗脑|告诉自己|暗道|自语)/.test(before);
+      const isSoundTail = /^[”"]?$/.test(after.trim().slice(0, 2)) || /^\s*$/.test(after);
+      const exempt = isOnomatopoeia || isInnerMonologue || (isSoundTail && /[嗡啵铛嘶砰隆沙哗哧嗤嗷]$/.test(before));
       findings.push({
         line: lineNo,
         column: dash.index + 1,
         type: 'em-dash',
-        severity: 'blocking',
-        message: '破折号按功能改写：打断→动作 beat/短句，拖长音→省略或动作，插入说明→逗号/冒号；勿一律改句号。',
+        severity: exempt ? 'advisory' : 'blocking',
+        message: exempt
+          ? '破折号（象声词/内心独白）：本书作者的有效用法，保留即可；确认不是每段都用（密度见 style-metrics 的 dash_per_kilo）。'
+          : '破折号按功能改写：打断→动作 beat/短句，拖长音→省略或动作，插入说明→逗号/冒号；勿一律改句号。'
+            + '（若承载象声词或内心独白，见 banned-words.md 的作者基线例外）',
         excerpt: compact(text.slice(Math.max(0, dash.index - 8), dash.index + dash[0].length + 8)),
       });
     }

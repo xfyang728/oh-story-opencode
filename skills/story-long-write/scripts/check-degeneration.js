@@ -142,7 +142,105 @@ function scanDocument(input) {
   findings.push(...findTruncation(content));
   findings.push(...findPlaceholders(content));
   findings.push(...findMetaLeak(content));
+  findings.push(...findLongParagraphs(content));
   findings.sort((a, b) => a.line - b.line || a.column - b.column);
+  return findings;
+}
+
+/**
+ * 长段提醒（v3 新增，全部 advisory）。
+ *
+ * 为什么放在退化脚本而不是只放 style-metrics.js：这个脚本每章都由写后 hook 跑，
+ * 适合做"随手提醒"；style-metrics.js 需要文风文件与基线，做正式判定。
+ * 两条不依赖基线的绝对线在 style-metrics.js 里是 blocking（≥80 字 / ≥60 字且 ≥5 拍），
+ * 这里只做更松的提示，避免同一件事在 hook 里重复阻断。
+ *
+ * 只统计**叙述段**：台词换人、连说多句是对话常态，不算段落漂移。
+ */
+function findLongParagraphs(content) {
+  const findings = [];
+  const QUOTE_RES = [/[\u201c][^\u201d]*[\u201d]/g, /[\u300c][^\u300d]*[\u300d]/g, /"[^"\n]*"/g];
+  const paras = [];
+  let current = null;
+  for (const item of content) {
+    if (!item.trimmed) {
+      if (current) paras.push(current);
+      current = null;
+      continue;
+    }
+    if (item.trimmed.startsWith('#')) continue;
+    if (!current) current = { head: item, parts: [] };
+    current.parts.push(item);
+  }
+  if (current) paras.push(current);
+
+  const paraStats = [];
+  for (const p of paras) {
+    // 注意：段落以首行入库，必须逐行判定，不能"首行是章名就跳过整段"——
+    // 本书正文一行一段，首行常是「第N章 章名」，整段跳过会把全章段落统计清零。
+    for (const item of p.parts) {
+      const lineText = item.trimmed;
+      if (!lineText) continue;
+      if (/^第[一二三四五六七八九十百千万两0-9]+章/.test(lineText)) continue;
+      if (lineText.startsWith('#')) continue;
+      const raw = item.text.replace(/^[\s\u3000]+/, '');
+      let quoted = 0;
+      for (const re of QUOTE_RES) {
+        for (const m of (raw.match(new RegExp(re.source, 'g')) || [])) {
+          quoted += m.replace(/\s/g, '').length;
+        }
+      }
+      const len = raw.replace(/\s/g, '').length;
+      if (len === 0) continue;
+      if (quoted / len >= 0.5) continue; // 对话段跳过
+      const beats = (raw.match(/[。！？!?]|…{2,}/g) || []).length;
+      paraStats.push({ line: item.lineNo, len, beats, head: raw.slice(0, 20) });
+    }
+  }
+
+  for (const s of paraStats) {
+    if (s.len >= 60) {
+      findings.push({
+        line: s.line,
+        column: 1,
+        type: 'long-paragraph-tic',
+        severity: 'advisory',
+        message: `长段提醒：叙述段 ${s.len} 字（≥60）「${s.head}…」——`
+          + '长段是"读起来累"的主因，考虑按句号拆段（拆段，不是删句）。'
+          + '实测某书作者 60+ 字段仅占 1.4%~2.2%，AI 续写常到 6%。',
+      });
+    }
+  }
+  // 长段成片：连续 3 段以上都在 40-60 字
+  let run = 0;
+  let runStart = 0;
+  for (let i = 0; i < paraStats.length; i += 1) {
+    const len = paraStats[i].len;
+    if (len >= 40 && len < 60) {
+      if (run === 0) runStart = paraStats[i].line;
+      run += 1;
+    } else {
+      if (run >= 3) {
+        findings.push({
+          line: runStart,
+          column: 1,
+          type: 'long-paragraph-run-tic',
+          severity: 'advisory',
+          message: `长段成片：连续 ${run} 段都在 40-60 字——读者会失去段落呼吸感，建议中间插入 1-2 个短段。`,
+        });
+      }
+      run = 0;
+    }
+  }
+  if (run >= 3) {
+    findings.push({
+      line: runStart,
+      column: 1,
+      type: 'long-paragraph-run-tic',
+      severity: 'advisory',
+      message: `长段成片：连续 ${run} 段都在 40-60 字——读者会失去段落呼吸感，建议中间插入 1-2 个短段。`,
+    });
+  }
   return findings;
 }
 
@@ -237,8 +335,13 @@ function findTruncation(content) {
   const body = content.filter((c) => isContent(c.trimmed));
   if (body.length === 0) return [];
   const last = body[body.length - 1];
+  // 多章合并样本 / 批末整体复扫：末尾是切分符或纯 `...` 时属采样边界，不是截断。
+  if (/^(?:[.．·]{3,}|…{2,}|[*\-—_]{3,})$/.test(last.trimmed)) return [];
   // a finished chapter ends on terminal/closing punctuation; otherwise it was cut off.
   if (/[。！？!?…”"』」）)】]$/.test(last.trimmed)) return [];
+  // 全文含 ≥2 个章节标题 → 判定为「多章样本」，不做截断判定（样本边界由切分符表达）。
+  const heads = content.filter((c) => /^第[一二三四五六七八九十百千万两0-9]+章/.test(c.trimmed)).length;
+  if (heads >= 2) return [];
   return [{
     line: last.lineNo,
     column: last.trimmed.length,
@@ -275,14 +378,10 @@ function findPlaceholders(content) {
 
 function findMetaLeak(content) {
   const findings = [];
-  let firstContentSeen = false;
   for (const { trimmed, lineNo } of content) {
     if (!isContent(trimmed)) continue;
-    if (!firstContentSeen) {
-      firstContentSeen = true;
-      // 标题行（第N章 章名，无 ## 前缀时也算）属「标题行以外的正文」之外，排除
-      if (/^第[一二三四五六七八九十百千万两0-9]+章/.test(trimmed)) continue;
-    }
+    // 标题行（第N章 章名）一律排除，不限于首行：多章合并样本与批末整体复扫都会带多个标题。
+    if (/^第[一二三四五六七八九十百千万两0-9]+章/.test(trimmed)) continue;
     const dialogue = isDialogueLike(trimmed);
     let m = META_TIER1_RE.exec(trimmed);
     if (m) {

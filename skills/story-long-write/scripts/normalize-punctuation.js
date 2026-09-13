@@ -4,17 +4,31 @@
 const fs = require('fs');
 const path = require('path');
 
-const USAGE = `Usage: node normalize-punctuation.js [--check] [--quote-mode keep|curly|ascii|yan] <file...>
+const USAGE = `Usage: node normalize-punctuation.js [--check] [--quote-mode keep|curly|ascii|yan] [--keep-ellipsis] <file...>
 
 Normalize正文 punctuation deterministically:
   - replace ellipses, em dashes, and double hyphens with Chinese punctuation
   - remove markdown divider lines (---) from正文
   - curly by default: corner brackets and straight quotes become paired curly quotes; use --quote-mode keep to preserve
+
+Options:
+  --check           只报告，不写文件
+  --quote-mode <s>  keep | curly | ascii | yan（默认 curly）
+  --keep-ellipsis   保留 \`……\`（文风基线声明作者本人使用省略号时必须加此开关）
+  -h, --help        显示本帮助
+
+口径说明（v3）
+  · 正文产物默认不保留 \`……\` / \`——\` / \`—\` / \`--\`。
+  · **但 \`文风.md\` 的 \`ellipsis_per_kilo\` 基线非零时，省略号是作者的语气武器，必须传
+    \`--keep-ellipsis\`**——用默认行为去刷会把作者声纹刷掉（实测某书作者 \`……\` 出现 1582 次、
+    密度 1.28/千字）。判据与密度带见 workflow-chapter.md 步骤 8b 与 style-metrics.js。
+  · 破折号 \`——\` 与双连字符 \`--\` 仍按功能改写，无作者基线例外（见 banned-words.md）。
 `;
 
 const options = {
   check: false,
   quoteMode: 'curly',
+  keepEllipsis: false,
   files: [],
 };
 
@@ -22,6 +36,8 @@ for (let i = 2; i < process.argv.length; i += 1) {
   const arg = process.argv[i];
   if (arg === '--check') {
     options.check = true;
+  } else if (arg === '--keep-ellipsis') {
+    options.keepEllipsis = true;
   } else if (arg === '--quote-mode') {
     const value = process.argv[i + 1];
     if (!value) die('--quote-mode requires keep, curly, ascii, or yan');
@@ -257,7 +273,9 @@ function normalizePausePunctuation(line, lineNo, commentOpen) {
 function normalizePausePunctuationPass(line, lineNo, commentSpans) {
   const findings = [];
   const original = line;
-  const pattern = /…+|\.{3,}|——|—|--+/g;
+  // `--keep-ellipsis` 时把 `…+` 从匹配里摘掉：作者本人使用省略号（文风基线 ellipsis_per_kilo 非零）
+  // 时，省略号是语气武器，不能按"无功能标点"清空。破折号与双连字符仍照改。
+  const pattern = options.keepEllipsis ? /\.{3,}|——|—|--+/g : /…+|\.{3,}|——|—|--+/g;
   let output = '';
   let lastIndex = 0;
   let match;
